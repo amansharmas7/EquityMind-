@@ -106,28 +106,59 @@ def risk_signal(snapshot: CompanySnapshot) -> Signal:
 def quality_signal(snapshot: CompanySnapshot) -> Signal:
     components: list[float] = []
     notes: list[str] = []
+    sector = snapshot.sector.strip().lower()
+    is_bank = sector in {"financials", "banking", "banks", "bank"}
+
     if snapshot.return_on_equity is not None:
         components.append(_clamp(snapshot.return_on_equity * 100))
         notes.append(f"ROE {snapshot.return_on_equity:.1%}")
-    if snapshot.free_cash_flow_margin is not None:
-        components.append(_clamp(snapshot.free_cash_flow_margin * 200))
-        notes.append(f"FCF margin {snapshot.free_cash_flow_margin:.1%}")
-    if snapshot.debt_to_equity is not None:
-        components.append(_clamp(60 - snapshot.debt_to_equity * 35))
-        notes.append(f"debt/equity {snapshot.debt_to_equity:.2f}")
-    if snapshot.current_ratio is not None:
-        components.append(_clamp((snapshot.current_ratio - 1) * 40))
-        notes.append(f"current ratio {snapshot.current_ratio:.2f}")
-    if snapshot.operating_margin is not None:
-        components.append(_clamp(snapshot.operating_margin * 150))
-        notes.append(f"operating margin {snapshot.operating_margin:.1%}")
+
+    if is_bank:
+        # Banks require balance-sheet and asset-quality measures; industrial D/E,
+        # current ratio and FCF margin are not directly comparable bank quality inputs.
+        if snapshot.gross_npa_pct is not None:
+            components.append(_clamp(50 - snapshot.gross_npa_pct * 15))
+            notes.append(f"gross NPA {snapshot.gross_npa_pct:.2f}%")
+        if snapshot.net_npa_pct is not None:
+            components.append(_clamp(50 - snapshot.net_npa_pct * 30))
+            notes.append(f"net NPA {snapshot.net_npa_pct:.2f}%")
+        if snapshot.capital_adequacy_pct is not None:
+            components.append(_clamp((snapshot.capital_adequacy_pct - 12) * 6))
+            notes.append(f"capital adequacy {snapshot.capital_adequacy_pct:.2f}%")
+        if snapshot.net_interest_margin_pct is not None:
+            components.append(_clamp(snapshot.net_interest_margin_pct * 10))
+            notes.append(f"NIM {snapshot.net_interest_margin_pct:.2f}%")
+        if snapshot.casa_ratio_pct is not None:
+            components.append(_clamp((snapshot.casa_ratio_pct - 20) * 2))
+            notes.append(f"CASA {snapshot.casa_ratio_pct:.2f}%")
+        if snapshot.provision_coverage_pct is not None:
+            components.append(_clamp((snapshot.provision_coverage_pct - 40) * 1.2))
+            notes.append(f"provision coverage {snapshot.provision_coverage_pct:.2f}%")
+    else:
+        if snapshot.free_cash_flow_margin is not None:
+            components.append(_clamp(snapshot.free_cash_flow_margin * 200))
+            notes.append(f"FCF margin {snapshot.free_cash_flow_margin:.1%}")
+        if snapshot.debt_to_equity is not None:
+            components.append(_clamp(60 - snapshot.debt_to_equity * 35))
+            notes.append(f"debt/equity {snapshot.debt_to_equity:.2f}")
+        if snapshot.current_ratio is not None:
+            components.append(_clamp((snapshot.current_ratio - 1) * 40))
+            notes.append(f"current ratio {snapshot.current_ratio:.2f}")
+        if snapshot.operating_margin is not None:
+            components.append(_clamp(snapshot.operating_margin * 150))
+            notes.append(f"operating margin {snapshot.operating_margin:.1%}")
+
     if not components:
-        return _unavailable("quality", "No profitability, cash-flow or balance-sheet metrics supplied.")
+        return _unavailable("quality", "No sector-appropriate profitability, capital or asset-quality metrics supplied.")
     score = _clamp(mean(components))
     confidence = "high" if len(components) >= 4 else "medium"
-    return Signal(name="quality", score=round(score, 2), label=_label(score),
-                  explanation="Quality proxy from " + "; ".join(notes) + ". Not a formal Piotroski F-score.",
-                  confidence=confidence)
+    method = "bank-specific asset-quality/capital/liquidity proxies" if is_bank else "profitability, cash-flow and balance-sheet proxies"
+    return Signal(
+        name="quality", score=round(score, 2), label=_label(score),
+        explanation=f"Quality proxy from {method}: " + "; ".join(notes) +
+                    ". This is not a regulatory rating or a formal Piotroski F-score.",
+        confidence=confidence,
+    )
 
 
 def analyst_signal(snapshot: CompanySnapshot) -> Signal:
