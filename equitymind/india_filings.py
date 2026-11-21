@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from html.parser import HTMLParser
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 import httpx
 
@@ -44,13 +44,28 @@ class IndianExchangeDocumentClient:
         parsed = urlparse(source_url)
         if parsed.scheme != "https" or not parsed.hostname or not _is_exchange_host(parsed.hostname):
             raise ValueError("Only HTTPS documents hosted on NSE India or BSE India are accepted")
+        current_url = source_url
         async with httpx.AsyncClient(
             timeout=45.0,
-            follow_redirects=True,
+            follow_redirects=False,
             headers={"User-Agent": "EquityMindResearchStudio/0.2 (research prototype)"},
         ) as client:
-            response = await client.get(source_url)
-            response.raise_for_status()
+            for _ in range(6):
+                response = await client.get(current_url)
+                if response.is_redirect or response.is_permanent_redirect:
+                    location = response.headers.get("location")
+                    if not location:
+                        raise ValueError("Exchange returned a redirect without a location")
+                    current_url = urljoin(str(response.url), location)
+                    next_url = urlparse(current_url)
+                    if (next_url.scheme != "https" or not next_url.hostname
+                            or not _is_exchange_host(next_url.hostname)):
+                        raise ValueError("Exchange document redirected outside NSE India/BSE India")
+                    continue
+                response.raise_for_status()
+                break
+            else:
+                raise ValueError("Exchange document exceeded the redirect limit")
         final_host = (response.url.host or "").lower()
         if not _is_exchange_host(final_host):
             raise ValueError("Exchange document redirected outside NSE India/BSE India")
