@@ -10,23 +10,23 @@ from equitymind.schemas import CompanySnapshot
 
 
 def test_calculates_seven_distinct_signals_for_supported_demo_ticker():
-    signals = compute_signals(get_snapshot("MSFT"))
+    signals = compute_signals(get_snapshot("TCS"))
     assert len(signals) == 7
     assert {signal.name for signal in signals} == {
         "valuation", "momentum", "risk", "quality", "analyst_consensus",
-        "short_interest", "news_sentiment",
+        "promoter_pledge", "news_sentiment",
     }
     assert all(-100 <= signal.score <= 100 for signal in signals)
 
 
 def test_ticker_normalization_and_validation():
-    assert get_snapshot(" aapl ").ticker == "AAPL"
+    assert get_snapshot(" reliance ").ticker == "RELIANCE"
     with pytest.raises(ValueError):
         CompanySnapshot(ticker="AAPL/EVIL", company_name="bad", as_of=date.today(), current_price=10)
 
 
 def test_relative_valuation_rewards_lower_multiple_than_peers():
-    snapshot = get_snapshot("JPM")
+    snapshot = get_snapshot("TCS")
     signal = valuation_signal(snapshot)
     assert signal.score > 0
     assert "peer median" in signal.explanation
@@ -40,7 +40,7 @@ def test_missing_metrics_are_explicitly_unavailable():
 
 
 def test_composite_reweights_only_available_signals():
-    signals = compute_signals(get_snapshot("AAPL"))
+    signals = compute_signals(get_snapshot("RELIANCE"))
     score_with_missing = weighted_overall_score(signals)
     signals_without_news = [s for s in signals if s.name != "news_sentiment"]
     score_without_news = weighted_overall_score(signals_without_news)
