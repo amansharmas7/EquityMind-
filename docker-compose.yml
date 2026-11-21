@@ -11,7 +11,7 @@ services:
       DATABASE_URL: postgresql://equitymind:${POSTGRES_PASSWORD:-equitymind-local-only}@db:5432/equitymind
       VECTOR_DIMENSIONS: ${VECTOR_DIMENSIONS:-384}
       GROQ_API_KEY: ${GROQ_API_KEY:-}
-      GROQ_MODEL: ${GROQ_MODEL:-llama-3.3-70b-versatile}
+      GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-20b}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-sentence-transformers/all-MiniLM-L6-v2}
       SEC_USER_AGENT: ${SEC_USER_AGENT:-EquityMindResearchStudio/0.1 contact@example.com}
       HF_HOME: /root/.cache/huggingface

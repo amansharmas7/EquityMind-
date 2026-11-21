@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     database_url: str | None = None
     vector_dimensions: int = Field(default=384, ge=1, le=8192)
     groq_api_key: str | None = None
-    groq_model: str = "llama-3.3-70b-versatile"
+    groq_model: str = "openai/gpt-oss-20b"
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
     sec_user_agent: str = "EquityMindResearchStudio/0.1 contact@example.com"
     finbert_model: str = "ProsusAI/finbert"
