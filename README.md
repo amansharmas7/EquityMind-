@@ -2,6 +2,11 @@
 
 **Evidence-aware equity research for Indian listed companies on NSE and BSE.**
 
+[![Python CI](https://github.com/amansharmas7/EquityMind-/actions/workflows/ci.yml/badge.svg)](https://github.com/amansharmas7/EquityMind-/actions/workflows/ci.yml)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/API-FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
 EquityMind is a research workbench for Indian cash equities. Its market defaults are India (IN), INR, NSE and the Asia/Kolkata timezone. It combines daily market-price history, transparent factor screens, portfolio concentration diagnostics, DCF sensitivities, and citation-grounded research over issuer disclosures.
 
 > **Prototype status (v0.2):** NSE/BSE symbol handling, a curated Indian watchlist, optional daily price/history retrieval, and manual ingestion of exchange-hosted documents are implemented. The watchlist is not a complete exchange security master. yfinance data is not an exchange-authorised or guaranteed real-time feed. The bundled company research fixtures are entirely synthetic: all ratios, prices, analyst estimates and price paths are invented. Do not treat them as actual financial data or investment signals.
@@ -194,6 +199,10 @@ All portfolio market values and DCF monetary inputs are interpreted as INR. Keep
 ```powershell
 pytest
 ```
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow and local checks. Security disclosures are described in [SECURITY.md](SECURITY.md).
 
 ## Research safeguards
 
