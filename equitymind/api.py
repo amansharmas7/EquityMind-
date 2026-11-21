@@ -333,6 +333,8 @@ async def rag_research(request: RAGResearchRequest) -> RAGResearchResponse:
             question=request.question,
             references=[
                 {
+                    "market_country": item.market_country,
+                    "exchange": item.exchange,
                     "filing_type": item.filing_type,
                     "filing_date": item.filing_date,
                     "section": item.section,
