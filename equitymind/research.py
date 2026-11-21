@@ -24,8 +24,8 @@ def _risk_notes(snapshot) -> list[str]:
         notes.append(f"Elevated debt/equity ({snapshot.debt_to_equity:.2f}) deserves balance-sheet review.")
     if snapshot.revenue_growth is not None and snapshot.revenue_growth < 0:
         notes.append(f"Reported revenue growth is negative ({snapshot.revenue_growth:.1%}).")
-    if snapshot.short_interest_pct is not None and snapshot.short_interest_pct >= 5:
-        notes.append(f"Short interest is elevated at {snapshot.short_interest_pct:.1f}% of float.")
+    if snapshot.promoter_pledge_pct is not None and snapshot.promoter_pledge_pct >= 20:
+        notes.append(f"Promoter shareholding pledge is elevated at {snapshot.promoter_pledge_pct:.1f}%; review the latest exchange filing.")
     risk = risk_statistics(snapshot.historical_prices)
     if risk and risk["maximum_drawdown"] >= 0.30:
         notes.append(f"Observed-window maximum drawdown is {risk['maximum_drawdown']:.1%}.")
@@ -46,14 +46,14 @@ def _compose_response(state: ResearchState) -> ResearchResponse:
     else:
         thesis = "The supplied factors are mixed or close to neutral. A differentiated thesis requires more issuer-specific evidence."
     return ResearchResponse(
-        ticker=snapshot.ticker, company_name=snapshot.company_name, as_of=snapshot.as_of,
+        ticker=snapshot.ticker, exchange=snapshot.exchange, currency=snapshot.currency, company_name=snapshot.company_name, as_of=snapshot.as_of,
         overall_score=score, signals=signals, thesis=thesis, key_risks=_risk_notes(snapshot),
         evidence=evidence, evidence_coverage=0.0 if not evidence or all(item.evidence_id.startswith("DEMO-") for item in evidence) else 1.0,
         methodology_notes=[
             "Composite score renormalizes weights over available signals; missing inputs are not treated as neutral.",
             "Signals are screening heuristics and are not calibrated probability estimates or investment advice.",
             "DEMO fixtures are fictional illustrative inputs. Replace them with timestamped provider data before use.",
-            "SEC filing evidence must be retrieved and citation-audited before making issuer-specific factual claims.",
+            "For Indian issuers, use primary NSE/BSE disclosures and citation-audit every company-specific factual claim.",
         ],
         is_demo_data=not evidence or all(item.evidence_id.startswith("DEMO-") for item in evidence),
     )

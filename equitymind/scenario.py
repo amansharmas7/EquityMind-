@@ -51,12 +51,13 @@ def analyze_scenarios(request: ScenarioRequest) -> ScenarioResponse:
             upside_pct=round((fair_value / request.current_price - 1) * 100, 2),
         ))
     return ScenarioResponse(
-        ticker=request.ticker, cases=results,
+        ticker=request.ticker, currency=request.currency, cases=results,
         assumptions=[
             f"Revenue grows at the case-specific rate for {request.forecast_years} years.",
             f"Free-cash-flow margin is held constant at {request.free_cash_flow_margin:.1%}.",
             f"Terminal growth is {request.terminal_growth:.1%}; each case uses its own discount rate.",
             "Cash and debt are added/subtracted from enterprise value; dilution and interim capital changes are not modelled.",
+            "All monetary inputs and fair values are in INR per share; verify that financial statement units are consistent.",
             "The bear/base/bull cases are mechanical sensitivities, not probability-weighted forecasts.",
         ],
     )

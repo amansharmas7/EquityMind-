@@ -17,7 +17,7 @@ SIGNAL_WEIGHTS: dict[str, float] = {
     "risk": 0.16,
     "quality": 0.20,
     "analyst_consensus": 0.10,
-    "short_interest": 0.08,
+    "promoter_pledge": 0.08,
     "news_sentiment": 0.14,
 }
 
@@ -142,13 +142,22 @@ def analyst_signal(snapshot: CompanySnapshot) -> Signal:
                   confidence=confidence)
 
 
-def short_interest_signal(snapshot: CompanySnapshot) -> Signal:
-    if snapshot.short_interest_pct is None:
-        return _unavailable("short_interest", "Short-interest percentage is unavailable.")
-    score = _clamp(35 - snapshot.short_interest_pct * 14)
-    return Signal(name="short_interest", score=round(score, 2), label=_label(score),
-                  explanation=f"Reported short interest is {snapshot.short_interest_pct:.2f}% of float; "
-                              "high short interest may indicate disagreement or squeeze risk.")
+def promoter_pledge_signal(snapshot: CompanySnapshot) -> Signal:
+    """Screen the share of promoter holdings pledged, as disclosed in shareholding patterns."""
+    if snapshot.promoter_pledge_pct is None:
+        return _unavailable(
+            "promoter_pledge",
+            "Promoter pledge data is unavailable; inspect the latest NSE/BSE shareholding-pattern filing.",
+        )
+    score = _clamp(35 - snapshot.promoter_pledge_pct * 4)
+    return Signal(
+        name="promoter_pledge", score=round(score, 2), label=_label(score),
+        explanation=(
+            f"{snapshot.promoter_pledge_pct:.2f}% of promoter shareholding is reported pledged. "
+            "A higher pledge level can increase governance and collateral-call risk; verify the "
+            "period and denominator in the source shareholding-pattern filing."
+        ),
+    )
 
 
 def news_sentiment_signal(snapshot: CompanySnapshot) -> Signal:
@@ -168,7 +177,7 @@ def compute_signals(snapshot: CompanySnapshot) -> list[Signal]:
     """Calculate seven independent signals; unavailable inputs remain explicit."""
     return [
         valuation_signal(snapshot), momentum_signal(snapshot), risk_signal(snapshot),
-        quality_signal(snapshot), analyst_signal(snapshot), short_interest_signal(snapshot),
+        quality_signal(snapshot), analyst_signal(snapshot), promoter_pledge_signal(snapshot),
         news_sentiment_signal(snapshot),
     ]
 

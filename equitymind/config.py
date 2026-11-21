@@ -7,6 +7,10 @@ class Settings(BaseSettings):
     app_env: str = "development"
     api_key: str | None = None
     demo_mode: bool = True
+    market_country: str = "IN"
+    market_exchange: str = "NSE"
+    market_currency: str = "INR"
+    market_timezone: str = "Asia/Kolkata"
     database_url: str | None = None
     vector_dimensions: int = Field(default=384, ge=1, le=8192)
     groq_api_key: str | None = None

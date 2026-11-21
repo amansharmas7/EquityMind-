@@ -6,9 +6,16 @@ from equitymind.schemas import PortfolioRequest, PortfolioResponse
 
 DEFAULT_SECTOR_SHOCKS = {
     "technology": -0.18,
+    "information technology": -0.18,
+    "it services": -0.18,
     "financials": -0.12,
+    "banking": -0.14,
+    "automobiles": -0.16,
+    "telecommunications": -0.13,
+    "fmcg": -0.08,
     "health care": -0.09,
     "healthcare": -0.09,
+    "pharmaceuticals": -0.10,
     "consumer discretionary": -0.14,
     "consumer staples": -0.07,
     "energy": -0.16,
@@ -56,7 +63,7 @@ def analyze_portfolio(request: PortfolioRequest) -> PortfolioResponse:
     top_weight = max(weights_by_ticker.values())
     concentration = "diversified" if hhi < 0.12 else "moderate" if hhi < 0.25 else "concentrated"
     return PortfolioResponse(
-        total_value=round(total, 2), positions=sorted(positions, key=lambda row: row["weight"], reverse=True),
+        currency=request.currency, total_value=round(total, 2), positions=sorted(positions, key=lambda row: row["weight"], reverse=True),
         sector_weights=sector_weights, herfindahl_index=round(hhi, 6),
         concentration_label=concentration, top_position_weight=round(top_weight, 6),
         estimated_stress_loss_pct=round(weighted_loss * 100, 3),
