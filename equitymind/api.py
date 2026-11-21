@@ -169,7 +169,7 @@ async def research(request: ResearchRequest) -> ResearchResponse:
     if request.exchange != "NSE":
         raise HTTPException(status_code=422, detail="Synthetic research fixtures currently use NSE symbols. BSE daily quotes/history are supported separately.")
     if not settings.demo_mode:
-        raise HTTPException(status_code=503, detail="No live market-data provider is configured. Enable DEMO_MODE for fixtures.")
+        raise HTTPException(status_code=503, detail="Live fundamentals are not yet connected to the research scoring pipeline. Enable DEMO_MODE for synthetic research fixtures; daily quotes and history are available through the separate market endpoints.")
     try:
         return run_research_with_graph(request)
     except KeyError as exc:
@@ -182,7 +182,7 @@ async def research_stream(request: ResearchRequest) -> StreamingResponse:
     if request.exchange != "NSE":
         raise HTTPException(status_code=422, detail="Synthetic research fixtures currently use NSE symbols.")
     if not settings.demo_mode:
-        raise HTTPException(status_code=503, detail="No live market-data provider is configured")
+        raise HTTPException(status_code=503, detail="Live fundamentals are not yet connected to the research scoring pipeline; enable DEMO_MODE for synthetic research fixtures.")
 
     async def events():
         yield "event: progress\ndata: " + json.dumps({"stage": "loading", "message": "Loading issuer snapshot"}) + "\n\n"
