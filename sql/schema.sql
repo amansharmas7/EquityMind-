@@ -20,8 +20,6 @@ CREATE TABLE IF NOT EXISTS filing_chunks (
 );
 
 -- Idempotent migration for databases created by the earlier SEC-only schema.
-ALTER TABLE research_runs ALTER COLUMN ticker TYPE VARCHAR(20);
-ALTER TABLE investment_theses ALTER COLUMN ticker TYPE VARCHAR(20);
 ALTER TABLE filing_chunks ALTER COLUMN cik DROP NOT NULL;
 ALTER TABLE filing_chunks ALTER COLUMN ticker TYPE VARCHAR(20);
 ALTER TABLE filing_chunks ALTER COLUMN filing_type TYPE VARCHAR(40);
@@ -46,6 +44,7 @@ CREATE TABLE IF NOT EXISTS research_runs (
     is_demo_data BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+ALTER TABLE research_runs ALTER COLUMN ticker TYPE VARCHAR(20);
 CREATE INDEX IF NOT EXISTS research_runs_ticker_date_idx
     ON research_runs (ticker, created_at DESC);
 
@@ -61,5 +60,6 @@ CREATE TABLE IF NOT EXISTS investment_theses (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+ALTER TABLE investment_theses ALTER COLUMN ticker TYPE VARCHAR(20);
 CREATE INDEX IF NOT EXISTS investment_theses_ticker_status_idx
     ON investment_theses (ticker, status);
