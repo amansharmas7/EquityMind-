@@ -254,9 +254,6 @@ The API now supports the complete filing-evidence path: SEC filing discovery, do
 4. Add integration tests against a disposable pgvector database and provider contract tests.
 5. Add a separate web client for saved research, portfolio views and scenario comparison.
 
-## Project origin and attribution
-
-This is a **fresh implementation** based on a high-level product brief for an EquityMind equity-research platform. It has its own code, project structure, test suite and Git history; it is not a copy of the original repository. The earlier collaborative prototype that informed the product brief is linked here for context: [BoFu001/equitymind-core](https://github.com/BoFu001/equitymind-core). The shared project's authorship and contributions remain with that original project and should be represented accurately in academic or professional descriptions.
 
 ## License
 
