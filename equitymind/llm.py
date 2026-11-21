@@ -15,7 +15,8 @@ class GroqChatClient:
         if not references:
             raise ValueError("At least one retrieved filing reference is required")
         evidence = [{
-            "citation": f"E{i}", "filing_type": r["filing_type"], "filing_date": str(r["filing_date"]),
+            "citation": f"E{i}", "market_country": r.get("market_country"), "exchange": r.get("exchange"),
+            "filing_type": r["filing_type"], "filing_date": str(r["filing_date"]),
             "section": r["section"], "source_url": r["source_url"],
             "similarity": r["similarity"], "text": r["text"],
         } for i, r in enumerate(references, 1)]
