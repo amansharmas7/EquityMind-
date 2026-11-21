@@ -20,10 +20,10 @@ def test_demo_universe_is_explicitly_labeled():
 
 
 def test_research_endpoint_returns_seven_signals_and_demo_flag():
-    response = client.post("/api/v1/research", json={"ticker": "MSFT"})
+    response = client.post("/api/v1/research", json={"ticker": "TCS"})
     assert response.status_code == 200
     payload = response.json()
-    assert payload["ticker"] == "MSFT"
+    assert payload["ticker"] == "TCS"
     assert len(payload["signals"]) == 7
     assert payload["is_demo_data"] is True
 
@@ -36,8 +36,8 @@ def test_research_endpoint_rejects_unknown_demo_ticker():
 def test_portfolio_endpoint_returns_concentration_metrics():
     response = client.post("/api/v1/portfolio/analyze", json={
         "positions": [
-            {"ticker": "MSFT", "market_value": 50, "sector": "Technology"},
-            {"ticker": "JPM", "market_value": 50, "sector": "Financials"},
+            {"ticker": "TCS", "market_value": 50, "sector": "Information Technology"},
+            {"ticker": "HDFCBANK", "market_value": 50, "sector": "Financials"},
         ]
     })
     assert response.status_code == 200
@@ -46,7 +46,7 @@ def test_portfolio_endpoint_returns_concentration_metrics():
 
 def test_dcf_endpoint_returns_three_cases():
     response = client.post("/api/v1/scenarios/dcf", json={
-        "ticker": "MSFT", "current_price": 430, "revenue": 245000000000,
+        "ticker": "TCS", "current_price": 3850, "revenue": 245000000000,
         "shares_outstanding": 7400000000, "free_cash_flow_margin": 0.28,
         "cash": 80000000000, "debt": 70000000000,
     })
@@ -87,7 +87,7 @@ def test_evidence_search_requires_database_and_embedding_configuration(monkeypat
     monkeypatch.setattr(settings, "database_url", None)
     monkeypatch.setattr(settings, "groq_api_key", None)
     response = client.post("/api/v1/evidence/search", json={
-        "ticker": "MSFT", "question": "What are the principal risks?"
+        "ticker": "TCS", "question": "What are the principal risks?"
     })
     assert response.status_code == 503
 
@@ -104,9 +104,9 @@ def test_rag_endpoint_returns_grounded_answer_and_audited_reference(monkeypatch)
     async def fake_embed(self, question):
         return [0.1, 0.2]
 
-    def fake_search(self, ticker, embedding, top_k):
+    def fake_search(self, ticker, embedding, top_k, market_country=None, exchange=None):
         return [{
-            "evidence_id": "MSFT-test-0", "ticker": ticker, "filing_type": "10-K",
+            "evidence_id": "TCS-test-0", "ticker": ticker, "market_country": "IN", "exchange": "NSE", "filing_type": "ANNUAL_REPORT",
             "filing_date": date(2026, 10, 1), "section": "Risk Factors",
             "text": "The company reports risk from cyber incidents.",
             "similarity": 0.91,
@@ -114,7 +114,7 @@ def test_rag_endpoint_returns_grounded_answer_and_audited_reference(monkeypatch)
         }]
 
     async def fake_answer(self, *, ticker, question, references):
-        assert ticker == "MSFT" and references[0]["section"] == "Risk Factors"
+        assert ticker == "TCS" and references[0]["section"] == "Risk Factors"
         return "Management identifies cyber incidents as a risk [E1]."
 
     monkeypatch.setattr(api.LocalEmbeddingClient, "embed_query", fake_embed)
@@ -122,13 +122,13 @@ def test_rag_endpoint_returns_grounded_answer_and_audited_reference(monkeypatch)
     monkeypatch.setattr(api.GroqChatClient, "generate_answer", fake_answer)
 
     response = client.post("/api/v1/research/rag", json={
-        "ticker": "msft", "question": "What are the principal cyber risks?"
+        "ticker": "tcs", "question": "What are the principal cyber risks?"
     })
     assert response.status_code == 200
     payload = response.json()
     assert payload["no_evidence"] is False
     assert payload["citation_audit"]["valid"] is True
-    assert payload["references"][0]["evidence_id"] == "MSFT-test-0"
+    assert payload["references"][0]["evidence_id"] == "TCS-test-0"
 
 
 def test_rag_endpoint_returns_clear_message_when_no_filings_match(monkeypatch):
@@ -157,3 +157,20 @@ def test_rag_endpoint_requires_groq_and_database_configuration(monkeypatch):
         "ticker": "MSFT", "question": "What are the risks?"
     })
     assert response.status_code == 503
+
+
+def test_indian_market_universe_is_inr_and_nse():
+    response = client.get("/api/v1/market/universe")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["market_country"] == "IN"
+    assert payload["currency"] == "INR"
+    assert "RELIANCE" in {row["symbol"] for row in payload["symbols"]}
+
+
+def test_indian_disclosure_endpoint_uses_official_exchange_sources():
+    response = client.get("/api/v1/market/disclosures")
+    assert response.status_code == 200
+    urls = [row["url"] for row in response.json()["sources"]]
+    assert any("nseindia.com" in url for url in urls)
+    assert any("bseindia.com" in url for url in urls)
