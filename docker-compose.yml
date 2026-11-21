@@ -1,0 +1,31 @@
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      DEMO_MODE: "true"
+      DATABASE_URL: postgresql://equitymind:equitymind@db:5432/equitymind
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: equitymind
+      POSTGRES_PASSWORD: equitymind
+      POSTGRES_DB: equitymind
+    ports:
+      - "5432:5432"
+    volumes:
+      - equitymind_pgdata:/var/lib/postgresql/data
+      - ./sql/schema.sql:/docker-entrypoint-initdb.d/001-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U equitymind -d equitymind"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  equitymind_pgdata:
