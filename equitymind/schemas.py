@@ -71,10 +71,6 @@ class Signal(BaseModel):
 class EvidenceItem(BaseModel):
     evidence_id: str
     ticker: str
-    market_country: str = "US"
-    exchange: str | None = None
-    market_country: str = "US"
-    exchange: str | None = None
     filing_type: str
     filing_date: date | None = None
     section: str
@@ -96,10 +92,6 @@ class ResearchRequest(BaseModel):
 
 class ResearchResponse(BaseModel):
     ticker: str
-    exchange: Literal["NSE", "BSE"] = "NSE"
-    currency: Literal["INR"] = "INR"
-    exchange: Literal["NSE", "BSE"] = "NSE"
-    currency: Literal["INR"] = "INR"
     company_name: str
     as_of: date
     overall_score: float | None
@@ -177,8 +169,6 @@ class ScenarioCase(BaseModel):
 
 class ScenarioResponse(BaseModel):
     ticker: str
-    currency: Literal["INR"] = "INR"
-    currency: Literal["INR"] = "INR"
     cases: list[ScenarioCase]
     assumptions: list[str]
 
@@ -225,10 +215,6 @@ class EvidenceSearchRequest(BaseModel):
 
 class FilingIngestResponse(BaseModel):
     ticker: str
-    market_country: str = "US"
-    exchange: str | None = None
-    market_country: str = "US"
-    exchange: str | None = None
     filing_type: str
     filing_date: date
     chunks_stored: int
@@ -262,10 +248,6 @@ class RAGReference(BaseModel):
     citation_id: str
     evidence_id: str
     ticker: str
-    market_country: str = "IN"
-    exchange: str | None = None
-    market_country: str = "IN"
-    exchange: str | None = None
     filing_type: str
     filing_date: date
     section: str
@@ -282,68 +264,6 @@ class RAGResearchResponse(BaseModel):
     citation_audit: CitationAuditResponse
     model: str
     no_evidence: bool = False
-
-
-class IndianFilingIngestRequest(BaseModel):
-    ticker: str = Field(min_length=1, max_length=20)
-    exchange: Literal["NSE", "BSE"] = "NSE"
-    filing_type: Literal[
-        "ANNUAL_REPORT", "QUARTERLY_RESULTS", "CORPORATE_ANNOUNCEMENT",
-        "SHAREHOLDING_PATTERN", "INVESTOR_PRESENTATION", "CREDIT_RATING", "OTHER",
-    ]
-    filing_date: date
-    document_id: str = Field(min_length=3, max_length=100)
-    filing_url: str = Field(min_length=20, max_length=1000)
-
-    @field_validator("ticker")
-    @classmethod
-    def normalize_ticker(cls, value: str) -> str:
-        clean = value.strip().upper()
-        if not clean or len(clean) > 20 or not all(ch.isalnum() or ch in ".-&" for ch in clean):
-            raise ValueError("Invalid NSE symbol or BSE scrip code")
-        return clean
-
-
-class IndianMarketQuote(BaseModel):
-    symbol: str
-    yahoo_symbol: str
-    exchange: Literal["NSE", "BSE"]
-    currency: Literal["INR"]
-    company_name: str
-    price: float = Field(gt=0)
-    previous_close: float | None = None
-    change: float | None = None
-    change_pct: float | None = None
-    open: float | None = None
-    day_high: float | None = None
-    day_low: float | None = None
-    volume: int = Field(ge=0)
-    market_cap: float | None = None
-    last_session_date: str
-    source: str
-    source_note: str
-
-
-class MarketHistoryBar(BaseModel):
-    date: str
-    open: float | None = None
-    high: float | None = None
-    low: float | None = None
-    close: float | None = None
-    adjusted_close: float | None = None
-    volume: int = Field(ge=0)
-
-
-class IndianMarketHistory(BaseModel):
-    symbol: str
-    yahoo_symbol: str
-    exchange: Literal["NSE", "BSE"]
-    currency: Literal["INR"]
-    period: str
-    interval: Literal["1d"]
-    source: str
-    source_note: str
-    bars: list[MarketHistoryBar]
 
 
 class IndianFilingIngestRequest(BaseModel):
