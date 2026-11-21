@@ -29,7 +29,7 @@ EquityMind is a research workbench for Indian cash equities. Its market defaults
 - **Manual disclosure ingestion:** this prototype does not crawl or automatically discover every filing from NSE/BSE. The user selects a company disclosure in the exchange portal and supplies its direct HTTPS attachment URL to the ingestion endpoint. Searchable PDFs are supported; image-only/scanned PDFs are not OCR'd.
 - The legacy SEC EDGAR endpoints remain available for US filings, but are not used as the Indian filing workflow.
 
-NSE's published market-timings page lists the normal equity/odd-lot session as opening at 09:15 and closing at 15:30; the app's configured timezone is Asia/Kolkata. Exchange notices can introduce special sessions or changed schedules, so this application does not hard-code trading-day or holiday decisions. Check the [NSE market timings](https://www.nseindia.com/resources/exchange-communication-holidays) before relying on session status.
+The app's configured market timezone is Asia/Kolkata. Exchange notices can introduce special sessions or changed schedules, so this application does not hard-code trading-day or holiday decisions; check the exchange's current market-timings and holiday notices before relying on session status.
 
 ## Architecture
 
@@ -115,7 +115,7 @@ Open <http://127.0.0.1:8000/health> and <http://127.0.0.1:8000/docs>.
 
 | Method | Endpoint | Purpose |
 | --- | --- | --- |
-| GET | `/api/v1/market/universe` | Curated Indian-equity watchlist |
+| GET | `/api/v1/market/universe` | Curated NSE Indian-equity watchlist |
 | GET | `/api/v1/market/quote/{symbol}?exchange=NSE` | Last available daily quote in INR |
 | GET | `/api/v1/market/history/{symbol}?exchange=NSE&period=1y` | Daily OHLCV history |
 | GET | `/api/v1/market/disclosures` | Official NSE/BSE/SEBI disclosure links |
