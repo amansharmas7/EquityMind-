@@ -125,8 +125,8 @@ async def recent_filings(cik: str) -> dict:
 @app.post("/api/v1/filings/ingest", response_model=FilingIngestResponse, dependencies=[Depends(require_api_key)])
 async def ingest_filing(request: FilingIngestRequest) -> FilingIngestResponse:
     """Download one SEC filing, chunk it, embed chunks and store them in pgvector."""
-    if not settings.database_url or not settings.groq_api_key:
-        raise HTTPException(status_code=503, detail="DATABASE_URL and GROQ_API_KEY are required for filing ingestion")
+    if not settings.database_url:
+        raise HTTPException(status_code=503, detail="DATABASE_URL is required for filing ingestion")
     try:
         sec = SecEdgarClient(settings.sec_user_agent)
         text = await sec.fetch_filing_text(request.filing_url)
@@ -158,8 +158,8 @@ async def ingest_filing(request: FilingIngestRequest) -> FilingIngestResponse:
 @app.post("/api/v1/evidence/search", response_model=EvidenceSearchResponse, dependencies=[Depends(require_api_key)])
 async def search_evidence(request: EvidenceSearchRequest) -> EvidenceSearchResponse:
     """Retrieve the most similar stored filing passages for one ticker."""
-    if not settings.database_url or not settings.groq_api_key:
-        raise HTTPException(status_code=503, detail="DATABASE_URL and GROQ_API_KEY are required for evidence search")
+    if not settings.database_url:
+        raise HTTPException(status_code=503, detail="DATABASE_URL is required for evidence search")
     try:
         embedder = LocalEmbeddingClient(settings.embedding_model, settings.vector_dimensions)
         vector = await embedder.embed_query(request.question)
