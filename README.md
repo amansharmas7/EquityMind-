@@ -13,7 +13,7 @@ EquityMind is a research workbench for Indian cash equities. Its market defaults
 | NSE/BSE symbol handling | Resolves NSE symbols to Yahoo Finance `.NS` symbols and BSE scrip codes to `.BO`; explicit suffixes are also accepted. |
 | Curated Indian watchlist | Starts with 20 widely followed Indian large-cap names; this is a watchlist, not a full exchange master or recommendation list. |
 | Daily market data | Optional yfinance adapter returns the last available daily quote and daily OHLCV history, denominated in INR when the provider reports INR. |
-| Seven-factor research screen | Valuation, momentum, historical risk, quality, analyst consensus, promoter-pledge risk and news sentiment. Missing inputs remain unavailable rather than being fabricated. |
+| Seven-factor research screen | Valuation, momentum, historical risk, quality, analyst consensus, promoter-pledge risk and news sentiment. Missing inputs remain unavailable rather than being fabricated. Banks use NPA, capital adequacy, NIM and CASA metrics instead of industrial leverage/current-ratio heuristics. |
 | Promoter pledge signal | Replaces the US-centric short-interest factor with promoter-shareholding pledge percentage, when a dated shareholding-pattern disclosure provides it. |
 | NSE/BSE disclosures | Links to official exchange disclosure portals and accepts user-supplied, direct HTTPS NSE/BSE-hosted documents for extraction and filing-grounded RAG. |
 | Exchange-aware RAG | Stores market country, exchange, ticker, filing type, period and source URL alongside each embedded chunk. |
@@ -107,7 +107,7 @@ docker compose up --build -d
 docker compose ps
 ```
 
-The Docker image installs the India market and searchable-PDF adapters, database driver and local embeddings. PostgreSQL initialises `sql/schema.sql` when the database volume is first created. The schema contains idempotent migration statements for the earlier SEC-only filing layout.
+The Docker image installs the India market and searchable-PDF adapters, database driver and local embeddings. PostgreSQL initialises `sql/schema.sql` when the database volume is first created. The schema includes idempotent migration statements for the earlier SEC-only layout. If a PostgreSQL volume already exists, re-run the migration manually with `docker compose exec -T db psql -U equitymind -d equitymind -f /docker-entrypoint-initdb.d/001-schema.sql`.
 
 Open <http://127.0.0.1:8000/health> and <http://127.0.0.1:8000/docs>.
 
