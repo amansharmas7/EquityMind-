@@ -174,3 +174,30 @@ def test_indian_disclosure_endpoint_uses_official_exchange_sources():
     urls = [row["url"] for row in response.json()["sources"]]
     assert any("nseindia.com" in url for url in urls)
     assert any("bseindia.com" in url for url in urls)
+
+
+def test_indian_market_quote_returns_inr_without_network(monkeypatch):
+    import equitymind.api as api
+    from equitymind.schemas import IndianMarketQuote
+
+    def fake_quote(self, symbol, exchange):
+        assert symbol == "RELIANCE" and exchange == "NSE"
+        return IndianMarketQuote(
+            symbol="RELIANCE", yahoo_symbol="RELIANCE.NS", exchange="NSE",
+            currency="INR", company_name="Example", price=1000.0,
+            previous_close=990.0, change=10.0, change_pct=1.01,
+            open=995.0, day_high=1005.0, day_low=990.0, volume=12345,
+            market_cap=None, last_session_date="2026-11-20",
+            source="test", source_note="synthetic test response",
+        )
+
+    monkeypatch.setattr(api.YFinanceIndiaClient, "quote", fake_quote)
+    response = client.get("/api/v1/market/quote/RELIANCE?exchange=NSE")
+    assert response.status_code == 200
+    assert response.json()["currency"] == "INR"
+    assert response.json()["price"] == 1000.0
+
+
+def test_bse_does_not_silently_use_nse_research_fixture():
+    response = client.post("/api/v1/research", json={"ticker": "RELIANCE", "exchange": "BSE"})
+    assert response.status_code == 422
