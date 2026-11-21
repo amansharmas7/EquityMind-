@@ -20,6 +20,8 @@ CREATE TABLE IF NOT EXISTS filing_chunks (
 );
 
 -- Idempotent migration for databases created by the earlier SEC-only schema.
+ALTER TABLE research_runs ALTER COLUMN ticker TYPE VARCHAR(20);
+ALTER TABLE investment_theses ALTER COLUMN ticker TYPE VARCHAR(20);
 ALTER TABLE filing_chunks ALTER COLUMN cik DROP NOT NULL;
 ALTER TABLE filing_chunks ALTER COLUMN ticker TYPE VARCHAR(20);
 ALTER TABLE filing_chunks ALTER COLUMN filing_type TYPE VARCHAR(40);
