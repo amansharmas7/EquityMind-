@@ -14,8 +14,8 @@ from equitymind.citations import audit_citations
 from equitymind.config import get_settings
 from equitymind.demo_data import SNAPSHOTS
 from equitymind.portfolio import analyze_portfolio
-from equitymind.embeddings import OpenAIEmbeddingClient
-from equitymind.llm import OpenAIChatClient
+from equitymind.embeddings import LocalEmbeddingClient
+from equitymind.llm import GroqChatClient
 from equitymind.pgvector_store import PgVectorStore
 from equitymind.rag import chunk_filing_text
 from equitymind.sec_edgar import SecEdgarClient
@@ -125,8 +125,8 @@ async def recent_filings(cik: str) -> dict:
 @app.post("/api/v1/filings/ingest", response_model=FilingIngestResponse, dependencies=[Depends(require_api_key)])
 async def ingest_filing(request: FilingIngestRequest) -> FilingIngestResponse:
     """Download one SEC filing, chunk it, embed chunks and store them in pgvector."""
-    if not settings.database_url or not settings.openai_api_key:
-        raise HTTPException(status_code=503, detail="DATABASE_URL and OPENAI_API_KEY are required for filing ingestion")
+    if not settings.database_url or not settings.groq_api_key:
+        raise HTTPException(status_code=503, detail="DATABASE_URL and GROQ_API_KEY are required for filing ingestion")
     try:
         sec = SecEdgarClient(settings.sec_user_agent)
         text = await sec.fetch_filing_text(request.filing_url)
@@ -135,8 +135,8 @@ async def ingest_filing(request: FilingIngestRequest) -> FilingIngestResponse:
             raise HTTPException(status_code=422, detail="No filing text could be extracted")
         if len(chunks) > 500:
             raise HTTPException(status_code=413, detail="Filing exceeds the 500-chunk ingestion limit")
-        embedder = OpenAIEmbeddingClient(
-            settings.openai_api_key, settings.openai_embedding_model, settings.vector_dimensions
+        embedder = LocalEmbeddingClient(
+            settings.groq_api_key, settings.embedding_model, settings.vector_dimensions
         )
         vectors = await embedder.embed_texts(chunks)
         store = PgVectorStore(settings.database_url)
@@ -160,11 +160,11 @@ async def ingest_filing(request: FilingIngestRequest) -> FilingIngestResponse:
 @app.post("/api/v1/evidence/search", response_model=EvidenceSearchResponse, dependencies=[Depends(require_api_key)])
 async def search_evidence(request: EvidenceSearchRequest) -> EvidenceSearchResponse:
     """Retrieve the most similar stored filing passages for one ticker."""
-    if not settings.database_url or not settings.openai_api_key:
-        raise HTTPException(status_code=503, detail="DATABASE_URL and OPENAI_API_KEY are required for evidence search")
+    if not settings.database_url or not settings.groq_api_key:
+        raise HTTPException(status_code=503, detail="DATABASE_URL and GROQ_API_KEY are required for evidence search")
     try:
-        embedder = OpenAIEmbeddingClient(
-            settings.openai_api_key, settings.openai_embedding_model, settings.vector_dimensions
+        embedder = LocalEmbeddingClient(
+            settings.groq_api_key, settings.embedding_model, settings.vector_dimensions
         )
         vector = await embedder.embed_query(request.question)
         rows = PgVectorStore(settings.database_url).search(request.ticker, vector, request.top_k)
@@ -184,14 +184,14 @@ async def search_evidence(request: EvidenceSearchRequest) -> EvidenceSearchRespo
 @app.post("/api/v1/research/rag", response_model=RAGResearchResponse, dependencies=[Depends(require_api_key)])
 async def rag_research(request: RAGResearchRequest) -> RAGResearchResponse:
     """Retrieve filing evidence from pgvector and synthesize a cited answer with OpenAI."""
-    if not settings.database_url or not settings.openai_api_key:
+    if not settings.database_url or not settings.groq_api_key:
         raise HTTPException(
             status_code=503,
-            detail="DATABASE_URL and OPENAI_API_KEY are required for filing-grounded RAG research",
+            detail="DATABASE_URL and GROQ_API_KEY are required for filing-grounded RAG research",
         )
     try:
-        embedder = OpenAIEmbeddingClient(
-            settings.openai_api_key, settings.openai_embedding_model, settings.vector_dimensions
+        embedder = LocalEmbeddingClient(
+            settings.groq_api_key, settings.embedding_model, settings.vector_dimensions
         )
         query_vector = await embedder.embed_query(request.question)
         rows = PgVectorStore(settings.database_url).search(request.ticker, query_vector, request.top_k)
@@ -205,7 +205,7 @@ async def rag_research(request: RAGResearchRequest) -> RAGResearchResponse:
                 ),
                 references=[],
                 citation_audit=audit_citations("", []),
-                model=settings.openai_model,
+                model=settings.groq_model,
                 no_evidence=True,
             )
         references = [
@@ -222,8 +222,8 @@ async def rag_research(request: RAGResearchRequest) -> RAGResearchResponse:
             )
             for index, row in enumerate(rows, start=1)
         ]
-        answer = await OpenAIChatClient(
-            settings.openai_api_key, settings.openai_model
+        answer = await GroqChatClient(
+            settings.groq_api_key, settings.groq_model
         ).generate_answer(
             ticker=request.ticker,
             question=request.question,
@@ -243,7 +243,7 @@ async def rag_research(request: RAGResearchRequest) -> RAGResearchResponse:
         return RAGResearchResponse(
             ticker=request.ticker, question=request.question, answer=answer,
             references=references, citation_audit=audit,
-            model=settings.openai_model, no_evidence=False,
+            model=settings.groq_model, no_evidence=False,
         )
     except HTTPException:
         raise

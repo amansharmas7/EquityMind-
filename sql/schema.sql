@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS filing_chunks (
     chunk_index INTEGER NOT NULL CHECK (chunk_index >= 0),
     text TEXT NOT NULL,
     source_url TEXT NOT NULL,
-    embedding VECTOR(1536) NOT NULL,
+    embedding VECTOR(384) NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (ticker, accession_number, section, chunk_index)
 );

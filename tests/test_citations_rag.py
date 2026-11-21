@@ -108,11 +108,13 @@ def test_sec_filing_download_rejects_non_sec_hosts_before_network_call():
         asyncio.run(client.fetch_filing_text("https://example.com/fake-filing.html"))
 
 
-def test_embedding_client_requires_api_key():
-    from equitymind.embeddings import OpenAIEmbeddingClient
+def test_local_embedding_client_enforces_384_dimensions():
+    from equitymind.embeddings import LocalEmbeddingClient
 
+    client = LocalEmbeddingClient()
+    assert client.dimensions == 384
     with pytest.raises(ValueError):
-        OpenAIEmbeddingClient("")
+        LocalEmbeddingClient(dimensions=1536)
 
 
 def test_sec_filing_download_only_accepts_edgar_archive_paths():

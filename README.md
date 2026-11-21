@@ -113,7 +113,7 @@ This is the recommended RAG setup. Compose starts PostgreSQL with pgvector, init
 ```powershell
 Copy-Item .env.example .env
 notepad .env
-# Set OPENAI_API_KEY and replace SEC_USER_AGENT with your real contact email.
+# Set GROQ_API_KEY and replace SEC_USER_AGENT with your real contact email.
 docker compose up --build -d
 docker compose ps
 ```
@@ -122,14 +122,14 @@ docker compose ps
 
 ```bash
 cp .env.example .env
-# Edit .env and set OPENAI_API_KEY plus a real SEC_USER_AGENT contact email.
+# Edit .env and set GROQ_API_KEY plus a real SEC_USER_AGENT contact email.
 docker compose up --build -d
 docker compose ps
 ```
 
 Check <http://127.0.0.1:8000/health> and open the interactive API docs at <http://127.0.0.1:8000/docs>.
 
-Follow logs with `docker compose logs -f api` or `docker compose logs -f db`. The default database password is for local development only. Change `POSTGRES_PASSWORD` before exposing the database to any network. Keep `.env` private: it is ignored by Git and must never be committed. OpenAI API usage is billed separately; set a project budget before ingesting large filings.
+Follow logs with `docker compose logs -f api` or `docker compose logs -f db`. The default database password is for local development only. Change `POSTGRES_PASSWORD` before exposing the database to any network. Keep `.env` private: it is ignored by Git and must never be committed. Groq API usage is billed separately; set a project budget before ingesting large filings.
 
 ### 5. Run the tests
 
@@ -208,7 +208,7 @@ Example DCF request:
 }
 ```
 
-The endpoint downloads the SEC document, chunks its text, creates OpenAI embeddings, and stores vectors and source metadata in pgvector.
+The endpoint downloads the SEC document, chunks its text, creates local Sentence Transformers embeddings, and stores vectors and source metadata in pgvector.
 
 4. Ask a question grounded in stored passages by sending this JSON to `POST /api/v1/research/rag`:
 
@@ -222,7 +222,7 @@ The endpoint downloads the SEC document, chunks its text, creates OpenAI embeddi
 
 The response includes the generated answer, source passages, SEC URLs, similarity values, and a citation audit. Citation auditing checks whether citation IDs refer to retrieved passages; it does not independently validate the model's interpretation.
 
-The Compose schema uses `VECTOR(1536)`, matching the default `text-embedding-3-small` output. If embedding dimensions are changed, update both `VECTOR_DIMENSIONS` and the SQL column definition. Changing an existing database requires a migration; the init script only runs when the database volume is first created.
+The Compose schema uses `VECTOR(384)`, matching the default `sentence-transformers/all-MiniLM-L6-v2` output. If embedding dimensions are changed, update both `VECTOR_DIMENSIONS` and the SQL column definition. Changing an existing database requires a migration; the init script only runs when the database volume is first created.
 
 ## PostgreSQL / pgvector schema
 
@@ -232,7 +232,7 @@ The optional database schema is in `sql/schema.sql`. It enables pgvector and cre
 - `research_runs` for structured research outputs and run metadata;
 - `investment_theses` for user-authored thesis statements and invalidation conditions.
 
-The API now supports the complete filing-evidence path: SEC filing discovery, download and chunking, OpenAI embeddings, PostgreSQL/pgvector persistence, ticker-scoped semantic retrieval, and OpenAI answer generation with citation auditing. User accounts and persistent investment-thesis CRUD are not yet wired into the HTTP routes.
+The API now supports the complete filing-evidence path: SEC filing discovery, download and chunking, local Sentence Transformers embeddings, PostgreSQL/pgvector persistence, ticker-scoped semantic retrieval, and Groq answer generation with citation auditing. User accounts and persistent investment-thesis CRUD are not yet wired into the HTTP routes.
 
 ## Data quality and safeguards
 

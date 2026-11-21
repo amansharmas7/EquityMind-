@@ -1,38 +1,32 @@
-"""OpenAI embedding adapter implemented over the public HTTPS API."""
-
+"""Free local sentence-transformer embeddings; no hosted embedding API key required."""
 from __future__ import annotations
+from functools import lru_cache
 
-import httpx
+@lru_cache(maxsize=2)
+def _load_model(model_name: str):
+    try:
+        from sentence_transformers import SentenceTransformer
+    except ImportError as exc:
+        raise RuntimeError("Install local embedding dependencies: pip install -e '.[local-embeddings]'") from exc
+    return SentenceTransformer(model_name, device="cpu")
 
-
-class OpenAIEmbeddingClient:
-    """Create normalized embeddings with an explicit model and vector size."""
-
-    def __init__(self, api_key: str, model: str = "text-embedding-3-small", dimensions: int = 1536):
-        if not api_key:
-            raise ValueError("OPENAI_API_KEY is required for embedding generation")
-        self.api_key = api_key
-        self.model = model
-        self.dimensions = dimensions
+class LocalEmbeddingClient:
+    """Generate normalized 384-dimensional vectors locally."""
+    def __init__(self, model: str = "sentence-transformers/all-MiniLM-L6-v2", dimensions: int = 384):
+        if dimensions != 384:
+            raise ValueError("all-MiniLM-L6-v2 returns 384 dimensions; VECTOR_DIMENSIONS must be 384")
+        self.model_name, self.dimensions = model, dimensions
 
     async def embed_texts(self, texts: list[str]) -> list[list[float]]:
         clean = [text.strip() for text in texts]
         if not clean or any(not text for text in clean):
             raise ValueError("Embedding input must contain non-empty text")
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.post(
-                "https://api.openai.com/v1/embeddings",
-                headers={"Authorization": f"Bearer {self.api_key}"},
-                json={"model": self.model, "input": clean, "dimensions": self.dimensions},
-            )
-            response.raise_for_status()
-            payload = response.json()
-        rows = sorted(payload.get("data", []), key=lambda item: item["index"])
-        vectors = [row["embedding"] for row in rows]
-        if len(vectors) != len(clean) or any(len(vector) != self.dimensions for vector in vectors):
-            raise RuntimeError("Embedding API returned an unexpected number of vectors or dimensions")
+        vectors = _load_model(self.model_name).encode(
+            clean, normalize_embeddings=True, convert_to_numpy=True, show_progress_bar=False
+        ).tolist()
+        if len(vectors) != len(clean) or any(len(v) != self.dimensions for v in vectors):
+            raise RuntimeError("Local embedding model returned an unexpected vector shape")
         return vectors
 
     async def embed_query(self, text: str) -> list[float]:
-        vectors = await self.embed_texts([text])
-        return vectors[0]
+        return (await self.embed_texts([text]))[0]

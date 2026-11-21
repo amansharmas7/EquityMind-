@@ -74,7 +74,7 @@ def test_api_key_is_enforced_when_configured(monkeypatch):
 
 def test_filing_ingest_requires_database_and_embedding_configuration(monkeypatch):
     monkeypatch.setattr(settings, "database_url", None)
-    monkeypatch.setattr(settings, "openai_api_key", None)
+    monkeypatch.setattr(settings, "groq_api_key", None)
     response = client.post("/api/v1/filings/ingest", json={
         "ticker": "MSFT", "cik": "789019", "filing_type": "10-K",
         "filing_date": "2026-10-01", "accession_number": "0000789019-26-000001",
@@ -85,7 +85,7 @@ def test_filing_ingest_requires_database_and_embedding_configuration(monkeypatch
 
 def test_evidence_search_requires_database_and_embedding_configuration(monkeypatch):
     monkeypatch.setattr(settings, "database_url", None)
-    monkeypatch.setattr(settings, "openai_api_key", None)
+    monkeypatch.setattr(settings, "groq_api_key", None)
     response = client.post("/api/v1/evidence/search", json={
         "ticker": "MSFT", "question": "What are the principal risks?"
     })
@@ -98,8 +98,8 @@ def test_rag_endpoint_returns_grounded_answer_and_audited_reference(monkeypatch)
     import equitymind.api as api
 
     monkeypatch.setattr(api.settings, "database_url", "postgresql://test")
-    monkeypatch.setattr(api.settings, "openai_api_key", "test-key")
-    monkeypatch.setattr(api.settings, "openai_model", "gpt-4.1-mini")
+    monkeypatch.setattr(api.settings, "groq_api_key", "test-key")
+    monkeypatch.setattr(api.settings, "groq_model", "llama-3.3-70b-versatile")
 
     async def fake_embed(self, question):
         return [0.1, 0.2]
@@ -117,9 +117,9 @@ def test_rag_endpoint_returns_grounded_answer_and_audited_reference(monkeypatch)
         assert ticker == "MSFT" and references[0]["section"] == "Risk Factors"
         return "Management identifies cyber incidents as a risk [E1]."
 
-    monkeypatch.setattr(api.OpenAIEmbeddingClient, "embed_query", fake_embed)
+    monkeypatch.setattr(api.LocalEmbeddingClient, "embed_query", fake_embed)
     monkeypatch.setattr(api.PgVectorStore, "search", fake_search)
-    monkeypatch.setattr(api.OpenAIChatClient, "generate_answer", fake_answer)
+    monkeypatch.setattr(api.GroqChatClient, "generate_answer", fake_answer)
 
     response = client.post("/api/v1/research/rag", json={
         "ticker": "msft", "question": "What are the principal cyber risks?"
@@ -134,12 +134,12 @@ def test_rag_endpoint_returns_grounded_answer_and_audited_reference(monkeypatch)
 def test_rag_endpoint_returns_clear_message_when_no_filings_match(monkeypatch):
     import equitymind.api as api
     monkeypatch.setattr(api.settings, "database_url", "postgresql://test")
-    monkeypatch.setattr(api.settings, "openai_api_key", "test-key")
+    monkeypatch.setattr(api.settings, "groq_api_key", "test-key")
 
     async def fake_embed(self, question):
         return [0.1, 0.2]
 
-    monkeypatch.setattr(api.OpenAIEmbeddingClient, "embed_query", fake_embed)
+    monkeypatch.setattr(api.LocalEmbeddingClient, "embed_query", fake_embed)
     monkeypatch.setattr(api.PgVectorStore, "search", lambda *args, **kwargs: [])
     response = client.post("/api/v1/research/rag", json={
         "ticker": "MSFT", "question": "What are the risks?"
@@ -149,10 +149,10 @@ def test_rag_endpoint_returns_clear_message_when_no_filings_match(monkeypatch):
     assert response.json()["references"] == []
 
 
-def test_rag_endpoint_requires_openai_and_database_configuration(monkeypatch):
+def test_rag_endpoint_requires_groq_and_database_configuration(monkeypatch):
     import equitymind.api as api
     monkeypatch.setattr(api.settings, "database_url", None)
-    monkeypatch.setattr(api.settings, "openai_api_key", None)
+    monkeypatch.setattr(api.settings, "groq_api_key", None)
     response = client.post("/api/v1/research/rag", json={
         "ticker": "MSFT", "question": "What are the risks?"
     })
