@@ -104,13 +104,32 @@ Copy-Item .env.example .env
 
 The local demo works without external API keys. Set `VECTOR_DIMENSIONS` to the same dimension used by the `embedding VECTOR(...)` column if you edit the schema. Keep `.env` out of version control. When securing a deployed API, set a strong `API_KEY` and send it in the `X-API-Key` header. The SEC client requires a descriptive `SEC_USER_AGENT` containing a contact email address.
 
-### 4. Run the API
+### 4. Start PostgreSQL + pgvector + the API with Docker Compose
 
-```bash
-uvicorn equitymind.api:app --reload
+This is the recommended RAG setup. Compose starts PostgreSQL with pgvector, initializes `sql/schema.sql` on first database-volume creation, and starts FastAPI with the PostgreSQL driver installed.
+
+**Windows PowerShell**
+
+```powershell
+Copy-Item .env.example .env
+notepad .env
+# Set OPENAI_API_KEY and replace SEC_USER_AGENT with your real contact email.
+docker compose up --build -d
+docker compose ps
 ```
 
-Open the interactive API documentation at <http://127.0.0.1:8000/docs>.
+**macOS / Linux**
+
+```bash
+cp .env.example .env
+# Edit .env and set OPENAI_API_KEY plus a real SEC_USER_AGENT contact email.
+docker compose up --build -d
+docker compose ps
+```
+
+Check <http://127.0.0.1:8000/health> and open the interactive API docs at <http://127.0.0.1:8000/docs>.
+
+Follow logs with `docker compose logs -f api` or `docker compose logs -f db`. The default database password is for local development only. Change `POSTGRES_PASSWORD` before exposing the database to any network. Keep `.env` private: it is ignored by Git and must never be committed. OpenAI API usage is billed separately; set a project budget before ingesting large filings.
 
 ### 5. Run the tests
 
@@ -127,6 +146,7 @@ pytest
 | GET | `/api/v1/filings/recent/{cik}` | Discover recent SEC 10-K and 10-Q filings |
 | POST | `/api/v1/filings/ingest` | Download, chunk, embed and store a filing in pgvector (requires keys/database) |
 | POST | `/api/v1/evidence/search` | Retrieve ticker-scoped filing passages by semantic similarity |
+| POST | `/api/v1/research/rag` | Retrieve filing evidence and generate an auditable, cited OpenAI answer |
 | POST | `/api/v1/research` | Run the seven-factor research workflow |
 | POST | `/api/v1/research/stream` | Stream progress and final research result using SSE |
 | POST | `/api/v1/portfolio/analyze` | Portfolio weights, concentration and sector stress |
@@ -171,6 +191,39 @@ Example DCF request:
 }
 ```
 
+### End-to-end filing RAG example
+
+1. Find the issuer's CIK and recent filing metadata using `GET /api/v1/filings/recent/{cik}`. Microsoft's CIK is `789019`.
+2. Select a recent 10-K or 10-Q result and copy its `filing_date`, `accession_number`, and `url`.
+3. Submit those returned values to `POST /api/v1/filings/ingest`:
+
+```json
+{
+  "ticker": "MSFT",
+  "cik": "789019",
+  "filing_type": "10-K",
+  "filing_date": "YYYY-MM-DD",
+  "accession_number": "SEC accession number from step 1",
+  "filing_url": "SEC filing URL from step 1"
+}
+```
+
+The endpoint downloads the SEC document, chunks its text, creates OpenAI embeddings, and stores vectors and source metadata in pgvector.
+
+4. Ask a question grounded in stored passages by sending this JSON to `POST /api/v1/research/rag`:
+
+```json
+{
+  "ticker": "MSFT",
+  "question": "What principal risks does management describe for cloud services?",
+  "top_k": 6
+}
+```
+
+The response includes the generated answer, source passages, SEC URLs, similarity values, and a citation audit. Citation auditing checks whether citation IDs refer to retrieved passages; it does not independently validate the model's interpretation.
+
+The Compose schema uses `VECTOR(1536)`, matching the default `text-embedding-3-small` output. If embedding dimensions are changed, update both `VECTOR_DIMENSIONS` and the SQL column definition. Changing an existing database requires a migration; the init script only runs when the database volume is first created.
+
 ## PostgreSQL / pgvector schema
 
 The optional database schema is in `sql/schema.sql`. It enables pgvector and creates:
@@ -179,7 +232,7 @@ The optional database schema is in `sql/schema.sql`. It enables pgvector and cre
 - `research_runs` for structured research outputs and run metadata;
 - `investment_theses` for user-authored thesis statements and invalidation conditions.
 
-The current API exposes SEC filing discovery, filing ingestion, vector search and the SQL schema. Database migrations, user accounts and persistent thesis CRUD are not yet wired into the HTTP routes. Treat this as an implementation boundary, not a completed feature.
+The API now supports the complete filing-evidence path: SEC filing discovery, download and chunking, OpenAI embeddings, PostgreSQL/pgvector persistence, ticker-scoped semantic retrieval, and OpenAI answer generation with citation auditing. User accounts and persistent investment-thesis CRUD are not yet wired into the HTTP routes.
 
 ## Data quality and safeguards
 

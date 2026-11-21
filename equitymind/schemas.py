@@ -217,3 +217,40 @@ class EvidenceSearchResponse(BaseModel):
     ticker: str
     query: str
     results: list[EvidenceItem]
+
+
+
+class RAGResearchRequest(BaseModel):
+    ticker: str = Field(min_length=1, max_length=10)
+    question: str = Field(min_length=3, max_length=2000)
+    top_k: int = Field(default=6, ge=1, le=10)
+
+    @field_validator("ticker")
+    @classmethod
+    def normalize_ticker(cls, value: str) -> str:
+        clean = value.strip().upper()
+        if not clean.replace(".", "").replace("-", "").isalnum():
+            raise ValueError("Ticker may contain letters, digits, dots, and hyphens only")
+        return clean
+
+
+class RAGReference(BaseModel):
+    citation_id: str
+    evidence_id: str
+    ticker: str
+    filing_type: str
+    filing_date: date
+    section: str
+    text: str
+    similarity: float = Field(ge=0, le=1)
+    source_url: str
+
+
+class RAGResearchResponse(BaseModel):
+    ticker: str
+    question: str
+    answer: str
+    references: list[RAGReference]
+    citation_audit: CitationAuditResponse
+    model: str
+    no_evidence: bool = False

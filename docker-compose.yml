@@ -1,23 +1,38 @@
 services:
   api:
     build: .
+    restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     environment:
-      DEMO_MODE: "true"
-      DATABASE_URL: postgresql://equitymind:equitymind@db:5432/equitymind
+      APP_ENV: ${APP_ENV:-development}
+      API_KEY: ${API_KEY:-}
+      DEMO_MODE: ${DEMO_MODE:-true}
+      DATABASE_URL: postgresql://equitymind:${POSTGRES_PASSWORD:-equitymind-local-only}@db:5432/equitymind
+      VECTOR_DIMENSIONS: ${VECTOR_DIMENSIONS:-1536}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1-mini}
+      OPENAI_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
+      SEC_USER_AGENT: ${SEC_USER_AGENT:-EquityMindResearchStudio/0.1 contact@example.com}
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
 
   db:
     image: pgvector/pgvector:pg16
+    restart: unless-stopped
     environment:
       POSTGRES_USER: equitymind
-      POSTGRES_PASSWORD: equitymind
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-equitymind-local-only}
       POSTGRES_DB: equitymind
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - equitymind_pgdata:/var/lib/postgresql/data
       - ./sql/schema.sql:/docker-entrypoint-initdb.d/001-schema.sql:ro

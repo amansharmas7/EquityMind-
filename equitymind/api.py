@@ -15,6 +15,7 @@ from equitymind.config import get_settings
 from equitymind.demo_data import SNAPSHOTS
 from equitymind.portfolio import analyze_portfolio
 from equitymind.embeddings import OpenAIEmbeddingClient
+from equitymind.llm import OpenAIChatClient
 from equitymind.pgvector_store import PgVectorStore
 from equitymind.rag import chunk_filing_text
 from equitymind.sec_edgar import SecEdgarClient
@@ -25,6 +26,7 @@ from equitymind.schemas import (
     ResearchRequest, ResearchResponse, ScenarioRequest, ScenarioResponse,
     FilingIngestRequest, FilingIngestResponse, EvidenceSearchRequest, EvidenceSearchResponse, EvidenceItem,
 )
+from equitymind.schemas import RAGResearchRequest, RAGResearchResponse, RAGReference
 
 settings = get_settings()
 app = FastAPI(
@@ -176,3 +178,80 @@ async def search_evidence(request: EvidenceSearchRequest) -> EvidenceSearchRespo
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Evidence retrieval failed: {exc}") from exc
+
+
+
+@app.post("/api/v1/research/rag", response_model=RAGResearchResponse, dependencies=[Depends(require_api_key)])
+async def rag_research(request: RAGResearchRequest) -> RAGResearchResponse:
+    """Retrieve filing evidence from pgvector and synthesize a cited answer with OpenAI."""
+    if not settings.database_url or not settings.openai_api_key:
+        raise HTTPException(
+            status_code=503,
+            detail="DATABASE_URL and OPENAI_API_KEY are required for filing-grounded RAG research",
+        )
+    try:
+        embedder = OpenAIEmbeddingClient(
+            settings.openai_api_key, settings.openai_embedding_model, settings.vector_dimensions
+        )
+        query_vector = await embedder.embed_query(request.question)
+        rows = PgVectorStore(settings.database_url).search(request.ticker, query_vector, request.top_k)
+        if not rows:
+            return RAGResearchResponse(
+                ticker=request.ticker,
+                question=request.question,
+                answer=(
+                    "No relevant SEC filing passages were found for this ticker and question. "
+                    "Ingest a recent filing before requesting a filing-grounded answer."
+                ),
+                references=[],
+                citation_audit=audit_citations("", []),
+                model=settings.openai_model,
+                no_evidence=True,
+            )
+        references = [
+            RAGReference(
+                citation_id=f"E{index}",
+                evidence_id=row["evidence_id"],
+                ticker=row["ticker"],
+                filing_type=row["filing_type"],
+                filing_date=row["filing_date"],
+                section=row["section"],
+                text=row["text"],
+                similarity=max(0.0, min(1.0, float(row["similarity"]))),
+                source_url=row["source_url"],
+            )
+            for index, row in enumerate(rows, start=1)
+        ]
+        answer = await OpenAIChatClient(
+            settings.openai_api_key, settings.openai_model
+        ).generate_answer(
+            ticker=request.ticker,
+            question=request.question,
+            references=[
+                {
+                    "filing_type": item.filing_type,
+                    "filing_date": item.filing_date,
+                    "section": item.section,
+                    "source_url": item.source_url,
+                    "similarity": item.similarity,
+                    "text": item.text,
+                }
+                for item in references
+            ],
+        )
+        audit = audit_citations(answer, [item.citation_id for item in references])
+        return RAGResearchResponse(
+            ticker=request.ticker, question=request.question, answer=answer,
+            references=references, citation_audit=audit,
+            model=settings.openai_model, no_evidence=False,
+        )
+    except HTTPException:
+        raise
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:
+        # Avoid returning provider response bodies or credentials to the API caller.
+        raise HTTPException(
+            status_code=502,
+            detail="RAG research failed. Check server logs and verify OpenAI/pgvector configuration.",
+        ) from exc
