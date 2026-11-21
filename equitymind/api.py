@@ -135,9 +135,7 @@ async def ingest_filing(request: FilingIngestRequest) -> FilingIngestResponse:
             raise HTTPException(status_code=422, detail="No filing text could be extracted")
         if len(chunks) > 500:
             raise HTTPException(status_code=413, detail="Filing exceeds the 500-chunk ingestion limit")
-        embedder = LocalEmbeddingClient(
-            settings.groq_api_key, settings.embedding_model, settings.vector_dimensions
-        )
+        embedder = LocalEmbeddingClient(settings.embedding_model, settings.vector_dimensions)
         vectors = await embedder.embed_texts(chunks)
         store = PgVectorStore(settings.database_url)
         stored = store.insert_chunks(
@@ -163,9 +161,7 @@ async def search_evidence(request: EvidenceSearchRequest) -> EvidenceSearchRespo
     if not settings.database_url or not settings.groq_api_key:
         raise HTTPException(status_code=503, detail="DATABASE_URL and GROQ_API_KEY are required for evidence search")
     try:
-        embedder = LocalEmbeddingClient(
-            settings.groq_api_key, settings.embedding_model, settings.vector_dimensions
-        )
+        embedder = LocalEmbeddingClient(settings.embedding_model, settings.vector_dimensions)
         vector = await embedder.embed_query(request.question)
         rows = PgVectorStore(settings.database_url).search(request.ticker, vector, request.top_k)
         results = [EvidenceItem(
@@ -190,9 +186,7 @@ async def rag_research(request: RAGResearchRequest) -> RAGResearchResponse:
             detail="DATABASE_URL and GROQ_API_KEY are required for filing-grounded RAG research",
         )
     try:
-        embedder = LocalEmbeddingClient(
-            settings.groq_api_key, settings.embedding_model, settings.vector_dimensions
-        )
+        embedder = LocalEmbeddingClient(settings.embedding_model, settings.vector_dimensions)
         query_vector = await embedder.embed_query(request.question)
         rows = PgVectorStore(settings.database_url).search(request.ticker, query_vector, request.top_k)
         if not rows:
