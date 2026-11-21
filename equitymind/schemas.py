@@ -71,6 +71,8 @@ class Signal(BaseModel):
 class EvidenceItem(BaseModel):
     evidence_id: str
     ticker: str
+    market_country: str = "IN"
+    exchange: str | None = None
     filing_type: str
     filing_date: date | None = None
     section: str
@@ -92,6 +94,8 @@ class ResearchRequest(BaseModel):
 
 class ResearchResponse(BaseModel):
     ticker: str
+    exchange: Literal["NSE", "BSE"] = "NSE"
+    currency: Literal["INR"] = "INR"
     company_name: str
     as_of: date
     overall_score: float | None
@@ -169,6 +173,7 @@ class ScenarioCase(BaseModel):
 
 class ScenarioResponse(BaseModel):
     ticker: str
+    currency: Literal["INR"] = "INR"
     cases: list[ScenarioCase]
     assumptions: list[str]
 
@@ -215,6 +220,8 @@ class EvidenceSearchRequest(BaseModel):
 
 class FilingIngestResponse(BaseModel):
     ticker: str
+    market_country: str = "US"
+    exchange: str | None = None
     filing_type: str
     filing_date: date
     chunks_stored: int
@@ -248,6 +255,8 @@ class RAGReference(BaseModel):
     citation_id: str
     evidence_id: str
     ticker: str
+    market_country: str = "IN"
+    exchange: str | None = None
     filing_type: str
     filing_date: date
     section: str
