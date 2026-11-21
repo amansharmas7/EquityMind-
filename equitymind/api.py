@@ -51,6 +51,108 @@ async def health() -> dict:
     return {"status": "ok", "version": __version__, "demo_mode": settings.demo_mode}
 
 
+
+@app.get("/api/v1/market/universe", dependencies=[Depends(require_api_key)])
+async def indian_market_universe(exchange: str = Query(default="NSE", pattern="^(NSE|BSE)$")) -> dict:
+    """Return a curated Indian-equity watchlist, not a complete exchange master."""
+    return {"market_country": "IN", "exchange": exchange, "currency": "INR",
+            "symbols": INDIA_WATCHLIST, "count": len(INDIA_WATCHLIST),
+            "note": "Curated watchlist only; confirm listing status and identifiers with the exchange."}
+
+
+@app.get("/api/v1/market/quote/{symbol}", response_model=IndianMarketQuote,
+         dependencies=[Depends(require_api_key)])
+def indian_market_quote(symbol: str, exchange: str = Query(default="NSE", pattern="^(NSE|BSE)$")):
+    """Return last-available daily quote via the optional Yahoo Finance adapter."""
+    try:
+        return YFinanceIndiaClient().quote(symbol, exchange)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail="Indian market quote provider failed") from exc
+
+
+@app.get("/api/v1/market/history/{symbol}", response_model=IndianMarketHistory,
+         dependencies=[Depends(require_api_key)])
+def indian_market_history(
+    symbol: str,
+    exchange: str = Query(default="NSE", pattern="^(NSE|BSE)$"),
+    period: str = Query(default="1y", pattern="^(1mo|3mo|6mo|1y|2y|5y|max)$"),
+):
+    """Return daily OHLCV history for an NSE/BSE symbol."""
+    try:
+        return YFinanceIndiaClient().history(symbol, exchange, period)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail="Indian market history provider failed") from exc
+
+
+@app.get("/api/v1/market/disclosures", dependencies=[Depends(require_api_key)])
+async def indian_disclosure_sources() -> dict:
+    """Return primary-source disclosure portals for Indian listed companies."""
+    return {
+        "market_country": "IN",
+        "sources": [
+            {"exchange": "NSE", "type": "Corporate announcements",
+             "url": "https://www.nseindia.com/companies-listing/corporate-filings-announcements"},
+            {"exchange": "NSE", "type": "Financial results",
+             "url": "https://www.nseindia.com/companies-listing/corporate-filings-financial-results"},
+            {"exchange": "NSE", "type": "Shareholding pattern",
+             "url": "https://www.nseindia.com/companies-listing/corporate-filings-shareholding-pattern"},
+            {"exchange": "BSE", "type": "Corporate announcements",
+             "url": "https://www.bseindia.com/corporates/ann"},
+            {"exchange": "BSE", "type": "Financial results",
+             "url": "https://www.bseindia.com/corporates/Comp_Resultsnew.aspx"},
+            {"exchange": "BSE", "type": "Shareholding pattern",
+             "url": "https://www.bseindia.com/corporates/Sharehold_Searchnew.aspx"},
+            {"exchange": "SEBI", "type": "Curated corporate filing links",
+             "url": "https://www.sebi.gov.in/curation/corporate_filings.html"},
+        ],
+        "note": "Use original exchange disclosures as the source of record; verify filing date and issuer identifier.",
+    }
+
+
+@app.post("/api/v1/filings/india/ingest", response_model=FilingIngestResponse,
+          dependencies=[Depends(require_api_key)])
+async def ingest_indian_filing(request: IndianFilingIngestRequest) -> FilingIngestResponse:
+    """Ingest a searchable NSE/BSE-hosted issuer disclosure into pgvector."""
+    if not settings.database_url:
+        raise HTTPException(status_code=503, detail="DATABASE_URL is required for filing ingestion")
+    try:
+        document_text = await IndianExchangeDocumentClient().fetch_document_text(request.filing_url)
+        chunks = chunk_filing_text(document_text, max_words=350, overlap_words=50)
+        if not chunks:
+            raise HTTPException(status_code=422, detail="No searchable disclosure text could be extracted")
+        if len(chunks) > 500:
+            raise HTTPException(status_code=413, detail="Disclosure exceeds the 500-chunk ingestion limit")
+        embedder = LocalEmbeddingClient(settings.embedding_model, settings.vector_dimensions)
+        vectors = await embedder.embed_texts(chunks)
+        stored = PgVectorStore(settings.database_url).insert_chunks(
+            ticker=request.ticker, cik=None, market_country="IN", exchange=request.exchange,
+            issuer_id=request.ticker, filing_type=request.filing_type, filing_date=request.filing_date,
+            accession_number=request.document_id, source_url=request.filing_url,
+            chunks=chunks, embeddings=vectors,
+        )
+        return FilingIngestResponse(
+            ticker=request.ticker, market_country="IN", exchange=request.exchange,
+            filing_type=request.filing_type, filing_date=request.filing_date,
+            chunks_stored=stored, source_url=request.filing_url,
+        )
+    except HTTPException:
+        raise
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail="Indian disclosure ingestion failed") from exc
+
+
 @app.get("/api/v1/universe", dependencies=[Depends(require_api_key)])
 async def universe() -> dict:
     """Return the small local demo universe, not a claim of live 250-ticker coverage."""
