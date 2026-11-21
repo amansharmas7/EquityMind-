@@ -71,7 +71,10 @@ class PgVectorStore:
             connection.close()
         return len(chunks)
 
-    def search(\n        self, ticker: str, embedding: Sequence[float], top_k: int = 6,\n        market_country: str | None = None, exchange: str | None = None,\n    ) -> list[dict[str, Any]]:
+    def search(
+        self, ticker: str, embedding: Sequence[float], top_k: int = 6,
+        market_country: str | None = None, exchange: str | None = None,
+    ) -> list[dict[str, Any]]:
         if not 1 <= top_k <= 50:
             raise ValueError("top_k must be between 1 and 50")
         vector = format_vector(embedding)
