@@ -4,7 +4,7 @@ import pytest
 
 from equitymind.demo_data import get_snapshot
 from equitymind.quant import (
-    compute_signals, risk_statistics, valuation_signal, weighted_overall_score,
+    compute_signals, quality_signal, risk_statistics, valuation_signal, weighted_overall_score,
 )
 from equitymind.schemas import CompanySnapshot
 
@@ -65,3 +65,19 @@ def test_price_history_rejects_non_positive_values():
     with pytest.raises(ValueError):
         CompanySnapshot(ticker="ABC", company_name="Test", as_of=date.today(), current_price=5,
                         historical_prices=[5, 0, 6])
+
+
+def test_indian_bank_quality_uses_asset_quality_and_capital_metrics():
+    bank = get_snapshot("HDFCBANK")
+    signal = quality_signal(bank)
+    assert signal.label != "unavailable"
+    assert "gross NPA" in signal.explanation
+    assert "capital adequacy" in signal.explanation
+    assert "debt/equity" not in signal.explanation
+
+
+def test_bank_quality_does_not_depend_on_industrial_leverage_ratios():
+    bank = get_snapshot("ICICIBANK")
+    original = quality_signal(bank)
+    changed = bank.model_copy(update={"debt_to_equity": 0.1, "current_ratio": 99.0})
+    assert quality_signal(changed).score == original.score
