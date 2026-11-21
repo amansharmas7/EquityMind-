@@ -6,7 +6,7 @@ import hmac
 import json
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
 from equitymind import __version__
@@ -19,12 +19,15 @@ from equitymind.llm import GroqChatClient
 from equitymind.pgvector_store import PgVectorStore
 from equitymind.rag import chunk_filing_text
 from equitymind.sec_edgar import SecEdgarClient
+from equitymind.indian_market import INDIA_WATCHLIST, YFinanceIndiaClient
+from equitymind.india_filings import IndianExchangeDocumentClient
 from equitymind.research import run_research_with_graph
 from equitymind.scenario import analyze_scenarios
 from equitymind.schemas import (
     CitationAuditRequest, CitationAuditResponse, PortfolioRequest, PortfolioResponse,
     ResearchRequest, ResearchResponse, ScenarioRequest, ScenarioResponse,
     FilingIngestRequest, FilingIngestResponse, EvidenceSearchRequest, EvidenceSearchResponse, EvidenceItem,
+    IndianFilingIngestRequest, IndianMarketQuote, IndianMarketHistory,
 )
 from equitymind.schemas import RAGResearchRequest, RAGResearchResponse, RAGReference
 
@@ -163,9 +166,10 @@ async def search_evidence(request: EvidenceSearchRequest) -> EvidenceSearchRespo
     try:
         embedder = LocalEmbeddingClient(settings.embedding_model, settings.vector_dimensions)
         vector = await embedder.embed_query(request.question)
-        rows = PgVectorStore(settings.database_url).search(request.ticker, vector, request.top_k)
+        rows = PgVectorStore(settings.database_url).search(request.ticker, vector, request.top_k, request.market_country, request.exchange)
         results = [EvidenceItem(
-            evidence_id=row["evidence_id"], ticker=row["ticker"], filing_type=row["filing_type"],
+            evidence_id=row["evidence_id"], ticker=row["ticker"], market_country=row.get("market_country", request.market_country),
+            exchange=row.get("exchange"), filing_type=row["filing_type"],
             filing_date=row["filing_date"], section=row["section"], text=row["text"],
             similarity=max(0.0, min(1.0, float(row["similarity"]))), source_url=row["source_url"],
         ) for row in rows]
@@ -179,7 +183,7 @@ async def search_evidence(request: EvidenceSearchRequest) -> EvidenceSearchRespo
 
 @app.post("/api/v1/research/rag", response_model=RAGResearchResponse, dependencies=[Depends(require_api_key)])
 async def rag_research(request: RAGResearchRequest) -> RAGResearchResponse:
-    """Retrieve filing evidence from pgvector and synthesize a cited answer with OpenAI."""
+    """Retrieve filing evidence from pgvector and synthesize a cited answer with Groq."""
     if not settings.database_url or not settings.groq_api_key:
         raise HTTPException(
             status_code=503,
@@ -188,14 +192,14 @@ async def rag_research(request: RAGResearchRequest) -> RAGResearchResponse:
     try:
         embedder = LocalEmbeddingClient(settings.embedding_model, settings.vector_dimensions)
         query_vector = await embedder.embed_query(request.question)
-        rows = PgVectorStore(settings.database_url).search(request.ticker, query_vector, request.top_k)
+        rows = PgVectorStore(settings.database_url).search(request.ticker, query_vector, request.top_k, request.market_country, request.exchange)
         if not rows:
             return RAGResearchResponse(
                 ticker=request.ticker,
                 question=request.question,
                 answer=(
-                    "No relevant SEC filing passages were found for this ticker and question. "
-                    "Ingest a recent filing before requesting a filing-grounded answer."
+                    "No relevant filing passages were found for this ticker and question. "
+                    "For Indian issuers, ingest an NSE/BSE annual report, quarterly result or disclosure first."
                 ),
                 references=[],
                 citation_audit=audit_citations("", []),
@@ -206,8 +210,8 @@ async def rag_research(request: RAGResearchRequest) -> RAGResearchResponse:
             RAGReference(
                 citation_id=f"E{index}",
                 evidence_id=row["evidence_id"],
-                ticker=row["ticker"],
-                filing_type=row["filing_type"],
+                ticker=row["ticker"], market_country=row.get("market_country", request.market_country),
+                exchange=row.get("exchange"), filing_type=row["filing_type"],
                 filing_date=row["filing_date"],
                 section=row["section"],
                 text=row["text"],
@@ -247,5 +251,5 @@ async def rag_research(request: RAGResearchRequest) -> RAGResearchResponse:
         # Avoid returning provider response bodies or credentials to the API caller.
         raise HTTPException(
             status_code=502,
-            detail="RAG research failed. Check server logs and verify OpenAI/pgvector configuration.",
+            detail="RAG research failed. Check server logs and verify Groq/pgvector configuration.",
         ) from exc
