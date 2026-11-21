@@ -53,9 +53,9 @@ async def health() -> dict:
 
 
 @app.get("/api/v1/market/universe", dependencies=[Depends(require_api_key)])
-async def indian_market_universe(exchange: str = Query(default="NSE", pattern="^(NSE|BSE)$")) -> dict:
+async def indian_market_universe() -> dict:
     """Return a curated Indian-equity watchlist, not a complete exchange master."""
-    return {"market_country": "IN", "exchange": exchange, "currency": "INR",
+    return {"market_country": "IN", "exchange": "NSE", "currency": "INR",
             "symbols": INDIA_WATCHLIST, "count": len(INDIA_WATCHLIST),
             "note": "Curated watchlist only; confirm listing status and identifiers with the exchange."}
 
@@ -166,6 +166,8 @@ async def universe() -> dict:
 
 @app.post("/api/v1/research", response_model=ResearchResponse, dependencies=[Depends(require_api_key)])
 async def research(request: ResearchRequest) -> ResearchResponse:
+    if request.exchange != "NSE":
+        raise HTTPException(status_code=422, detail="Synthetic research fixtures currently use NSE symbols. BSE daily quotes/history are supported separately.")
     if not settings.demo_mode:
         raise HTTPException(status_code=503, detail="No live market-data provider is configured. Enable DEMO_MODE for fixtures.")
     try:
@@ -177,6 +179,8 @@ async def research(request: ResearchRequest) -> ResearchResponse:
 @app.post("/api/v1/research/stream", dependencies=[Depends(require_api_key)])
 async def research_stream(request: ResearchRequest) -> StreamingResponse:
     """Emit progress and a final JSON event using server-sent events."""
+    if request.exchange != "NSE":
+        raise HTTPException(status_code=422, detail="Synthetic research fixtures currently use NSE symbols.")
     if not settings.demo_mode:
         raise HTTPException(status_code=503, detail="No live market-data provider is configured")
 
